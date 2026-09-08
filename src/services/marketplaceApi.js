@@ -1,22 +1,53 @@
 /**
  * 1Fi Marketplace Dynamic API Service
  * Encapsulates dynamic asynchronous retrieval of products, variants,
- * categories, and EMI plans, simulating network roundtrips, search,
- * filtering, and sorting.
+ * categories, and EMI plans. Connects to Vercel Serverless Functions
+ * backed by Neon PostgreSQL when deployed, with transparent local fallback.
  */
 
 import { PRODUCTS_DATA, CATEGORIES } from '../data/productsData';
 import { calculateEMIDetails, EMI_TENURES } from './emiCalculator';
 
-// Helper to simulate realistic async network response
-const delay = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms));
+// Helper to simulate realistic async network response for local fallback
+const delay = (ms = 250) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const marketplaceApi = {
+  /**
+   * Check connection status to Neon PostgreSQL
+   */
+  async checkDatabaseStatus() {
+    try {
+      const res = await fetch('/api/init-db');
+      if (!res.ok) return { connected: false, message: 'Endpoint returned error' };
+      const data = await res.json();
+      return {
+        connected: Boolean(data.configured && data.success),
+        database: data.database || 'Neon PostgreSQL',
+        message: data.message
+      };
+    } catch (e) {
+      return { connected: false, message: 'Local fallback mode' };
+    }
+  },
+
+  /**
+   * Initialize / Seed Neon Database
+   */
+  async initializeDatabase() {
+    try {
+      const res = await fetch('/api/init-db', { method: 'POST' });
+      const data = await res.json();
+      return data;
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
   /**
    * Fetch all categories
    */
   async getCategories() {
-    await delay(100);
+    await delay(50);
     return [...CATEGORIES];
   },
 
@@ -29,12 +60,30 @@ export const marketplaceApi = {
    * @param {boolean} options.simulateError - Test error state
    */
   async getProducts({ category = 'all', search = '', sort = 'popular', simulateError = false } = {}) {
-    await delay(350);
-
     if (simulateError) {
       throw new Error('Failed to load marketplace products. Please check your network connection.');
     }
 
+    // Attempt live Neon Database via /api/products
+    try {
+      const params = new URLSearchParams();
+      if (category && category !== 'all') params.set('category', category);
+      if (search && search.trim() !== '') params.set('search', search.trim());
+      if (sort) params.set('sort', sort);
+
+      const res = await fetch(`/api/products?${params.toString()}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.configured && Array.isArray(json.data) && json.data.length > 0) {
+          return json.data;
+        }
+      }
+    } catch (err) {
+      // Graceful fallback to static data
+    }
+
+    // Local / fallback evaluation
+    await delay(150);
     let results = [...PRODUCTS_DATA];
 
     // Filter by Category
@@ -84,7 +133,19 @@ export const marketplaceApi = {
    * @param {string} id
    */
   async getProductById(id) {
-    await delay(200);
+    try {
+      const res = await fetch(`/api/products?id=${encodeURIComponent(id)}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.configured && json.data) {
+          return json.data;
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    await delay(100);
     const product = PRODUCTS_DATA.find(p => p.id === id);
     if (!product) {
       throw new Error(`Product with ID "${id}" was not found.`);
@@ -96,18 +157,20 @@ export const marketplaceApi = {
    * Calculate EMI plans dynamically for a specific product and price
    */
   async getEMIPlansForProduct(productOrPrice, preferredTenure = 6) {
-    await delay(150);
+    await delay(80);
     const price = typeof productOrPrice === 'number' 
       ? productOrPrice 
       : productOrPrice.variants.storage[0].price;
 
-    const allPlans = EMI_TENURES.map(tenure => {
-      return calculateEMIDetails(price, tenure.months);
+    const plans = EMI_TENURES.map(tenure => {
+      const emiDetails = calculateEMIDetails(price, tenure.months);
+      return {
+        ...tenure,
+        ...emiDetails,
+        isPreferred: tenure.months === preferredTenure
+      };
     });
 
-    return {
-      plans: allPlans,
-      recommendedPlan: allPlans.find(p => p.tenureMonths === preferredTenure) || allPlans[1]
-    };
+    return plans;
   }
 };

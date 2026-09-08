@@ -1,11 +1,11 @@
 /**
  * 1Fi Mutual Fund Portfolio & Credit Limit Service
- * Simulates fetching investment portfolio from CAMS / KFintech via PAN / Mobile OTP,
- * calculating pledgeable credit limits (typically 60-70% of equity MFs),
- * and managing mutual fund liens for marketplace purchases.
+ * Manages mutual fund holdings, credit lines, and loan liens.
+ * Integrates with Neon PostgreSQL serverless backend with transparent
+ * offline/localStorage fallback.
  */
 
-const INITIAL_PORTFOLIO = {
+export const INITIAL_PORTFOLIO = {
   investorName: 'Satyam Upadhyay',
   panMasked: 'ABCDE****F',
   phoneMasked: '+91 98****0195',
@@ -87,11 +87,30 @@ export function savePortfolioData(data) {
 }
 
 /**
+ * Fetch latest portfolio from Neon PostgreSQL API and synchronize local cache
+ */
+export async function fetchPortfolioFromDatabase() {
+  try {
+    const res = await fetch('/api/portfolio');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.configured && json.data) {
+        savePortfolioData(json.data);
+        return { success: true, source: 'neon_postgres', data: json.data };
+      }
+    }
+  } catch (err) {
+    // Graceful fallback to local cache
+  }
+  return { success: false, source: 'local_storage', data: getPortfolioData() };
+}
+
+/**
  * Pledges a mutual fund lien for an EMI plan purchase
  */
-export function createLienForOrder({ product, variant, emiPlan, selectedFundId }) {
+export async function createLienForOrder({ product, variant, emiPlan, selectedFundId }) {
   const current = getPortfolioData();
-  const lienAmount = emiPlan.requiredCollateral;
+  const lienAmount = emiPlan.requiredCollateral || (emiPlan.principal * 1.25);
   
   // Find fund or pick primary fund
   const fundIndex = current.funds.findIndex(f => f.id === selectedFundId);
@@ -108,8 +127,8 @@ export function createLienForOrder({ product, variant, emiPlan, selectedFundId }
     orderId,
     createdAt: new Date().toISOString(),
     productName: product.name,
-    productImage: variant.color.image,
-    variantDetails: `${variant.color.name} • ${variant.storage.label}`,
+    productImage: variant.color?.image || '',
+    variantDetails: `${variant.color?.name || ''} • ${variant.storage?.label || ''}`,
     principal: emiPlan.principal,
     tenureMonths: emiPlan.tenureMonths,
     monthlyEMI: emiPlan.monthlyEMI,
@@ -118,13 +137,24 @@ export function createLienForOrder({ product, variant, emiPlan, selectedFundId }
     pledgedCollateralValue: lienAmount,
     status: 'ACTIVE',
     nextDueAmount: emiPlan.monthlyEMI,
-    nextDueDate: emiPlan.schedule[0].dueDate,
+    nextDueDate: emiPlan.schedule?.[0]?.dueDate || 'In 30 days',
     emisRemaining: emiPlan.tenureMonths,
-    schedule: emiPlan.schedule
+    schedule: emiPlan.schedule || []
   };
 
   current.activeLoans = [newLoan, ...(current.activeLoans || [])];
   savePortfolioData(current);
+
+  // Asynchronously persist to Neon DB if API is online
+  try {
+    fetch('/api/loans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product, variant, emiPlan, selectedFundId })
+    }).catch(err => console.debug('Neon loan sync background notice:', err));
+  } catch (e) {
+    // Non-blocking
+  }
 
   return {
     success: true,
@@ -136,9 +166,49 @@ export function createLienForOrder({ product, variant, emiPlan, selectedFundId }
 }
 
 /**
+ * Pay EMI installment
+ */
+export async function payEMIInstallment(loanId) {
+  const current = getPortfolioData();
+  const loan = (current.activeLoans || []).find(l => l.loanId === loanId);
+  if (loan) {
+    loan.emisRemaining = Math.max(0, loan.emisRemaining - 1);
+    if (loan.emisRemaining === 0) {
+      loan.status = 'COMPLETED';
+    }
+    current.usedLimit = Math.max(0, current.usedLimit - loan.monthlyEMI);
+    savePortfolioData(current);
+
+    // Sync to Neon API
+    try {
+      fetch('/api/dues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loanId })
+      }).catch(err => console.debug('Neon dues sync notice:', err));
+    } catch (e) {
+      // Non-blocking
+    }
+  }
+  return current;
+}
+
+/**
  * Reset simulated portfolio to initial state
  */
-export function resetPortfolio() {
+export async function resetPortfolio() {
   savePortfolioData(INITIAL_PORTFOLIO);
+
+  // Sync reset to Neon DB if available
+  try {
+    fetch('/api/portfolio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reset' })
+    }).catch(err => console.debug('Neon reset notice:', err));
+  } catch (e) {
+    // Non-blocking
+  }
+
   return INITIAL_PORTFOLIO;
 }

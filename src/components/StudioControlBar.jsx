@@ -1,15 +1,25 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Smartphone, Monitor, RotateCcw, Sparkles } from 'lucide-react';
+import { Smartphone, Monitor, RotateCcw, Database, CheckCircle2 } from 'lucide-react';
 
 export default function StudioControlBar() {
-  const { displayMode, setDisplayMode, handleResetData } = useApp();
+  const { displayMode, setDisplayMode, handleResetData, dbStatus, handleSeedDatabase } = useApp();
 
   return (
     <header className="studio-control-bar">
       <div className="studio-brand">
         <span>1Fi Marketplace</span>
         <span className="studio-brand-badge">SDE ASSIGNMENT</span>
+        
+        {/* Database Status Indicator */}
+        <button
+          className={`db-status-pill ${dbStatus.connected ? 'connected' : 'disconnected'}`}
+          onClick={handleSeedDatabase}
+          title={dbStatus.connected ? 'Connected to Neon PostgreSQL (Click to re-verify/seed)' : 'Click to initialize & seed Neon Database'}
+        >
+          <Database size={12} />
+          <span>{dbStatus.connected ? 'Neon DB: Connected' : 'DB: Demo Store'}</span>
+        </button>
       </div>
 
       <div className="studio-actions">

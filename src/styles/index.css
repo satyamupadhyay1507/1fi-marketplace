@@ -51,6 +51,39 @@
   text-transform: uppercase;
 }
 
+.db-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.db-status-pill.connected {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34D399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.db-status-pill.connected:hover {
+  background: rgba(16, 185, 129, 0.25);
+}
+
+.db-status-pill.disconnected {
+  background: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.db-status-pill.disconnected:hover {
+  background: rgba(245, 158, 11, 0.25);
+}
+
 .studio-actions {
   display: flex;
   align-items: center;

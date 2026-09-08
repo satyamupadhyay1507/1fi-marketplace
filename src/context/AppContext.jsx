@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getPortfolioData, createLienForOrder, resetPortfolio } from '../services/portfolioService';
+import { getPortfolioData, createLienForOrder, resetPortfolio, fetchPortfolioFromDatabase } from '../services/portfolioService';
+import { marketplaceApi } from '../services/marketplaceApi';
 
 const AppContext = createContext();
 
@@ -14,21 +15,51 @@ export function AppProvider({ children }) {
   // Portfolio & Active Loans State
   const [portfolio, setPortfolio] = useState(getPortfolioData());
 
+  // Database Connection Status: { connected: boolean, message: string }
+  const [dbStatus, setDbStatus] = useState({ connected: false, checking: true, message: 'Checking...' });
+
   // Modal States
   const [selectedProductModal, setSelectedProductModal] = useState(null);
   const [checkoutData, setCheckoutData] = useState(null); // { product, variant, emiPlan }
   const [toast, setToast] = useState(null);
 
+  // Check database status and sync on initial load
+  useEffect(() => {
+    async function checkDb() {
+      try {
+        const status = await marketplaceApi.checkDatabaseStatus();
+        setDbStatus({ ...status, checking: false });
+
+        if (status.connected) {
+          const syncResult = await fetchPortfolioFromDatabase();
+          if (syncResult.success && syncResult.data) {
+            setPortfolio(syncResult.data);
+          }
+        }
+      } catch (err) {
+        setDbStatus({ connected: false, checking: false, message: 'Offline / Local Demo' });
+      }
+    }
+    checkDb();
+  }, []);
+
   // Sync portfolio state changes
-  const refreshPortfolio = () => {
-    setPortfolio(getPortfolioData());
+  const refreshPortfolio = async () => {
+    const local = getPortfolioData();
+    setPortfolio(local);
+    if (dbStatus.connected) {
+      const syncResult = await fetchPortfolioFromDatabase();
+      if (syncResult.success && syncResult.data) {
+        setPortfolio(syncResult.data);
+      }
+    }
   };
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => {
       setToast(null);
-    }, 3800);
+    }, 4000);
   };
 
   // Open Product Detail Modal
@@ -57,10 +88,26 @@ export function AppProvider({ children }) {
     showToast(`Order Placed! 0% EMI created via ${orderResult.loan.pledgedFundName}`, 'success');
   };
 
-  const handleResetData = () => {
-    const fresh = resetPortfolio();
+  const handleResetData = async () => {
+    const fresh = await resetPortfolio();
     setPortfolio(fresh);
-    showToast('Demo data reset to initial state');
+    showToast('Portfolio & order data reset to initial state');
+  };
+
+  const handleSeedDatabase = async () => {
+    showToast('Initializing & seeding Neon Database...', 'info');
+    try {
+      const res = await marketplaceApi.initializeDatabase();
+      if (res.success) {
+        setDbStatus({ connected: true, checking: false, message: 'Neon Database Live' });
+        await refreshPortfolio();
+        showToast('Neon PostgreSQL tables seeded successfully!', 'success');
+      } else {
+        showToast(res.message || 'DATABASE_URL not set in Vercel environment.', 'error');
+      }
+    } catch (err) {
+      showToast('Database init error: ' + err.message, 'error');
+    }
   };
 
   return (
@@ -74,6 +121,8 @@ export function AppProvider({ children }) {
         setDisplayMode,
         portfolio,
         refreshPortfolio,
+        dbStatus,
+        handleSeedDatabase,
         selectedProductModal,
         openProductDetail,
         closeProductDetail,
