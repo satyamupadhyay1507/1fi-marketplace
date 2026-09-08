@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* 1Fi Brand Identity Colors */
+  --color-primary: #6C3CE9;
+  --color-primary-hover: #5A2BD8;
+  --color-primary-light: #F1ECFE;
+  --color-primary-muted: rgba(108, 60, 233, 0.12);
+  --color-primary-dark: #3F19A3;
+
+  /* Gradient Palettes */
+  --gradient-banner: linear-gradient(135deg, #100647 0%, #2A1278 45%, #4D21C9 100%);
+  --gradient-purple-btn: linear-gradient(135deg, #6C3CE9 0%, #834BF8 100%);
+  --gradient-gold: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  --gradient-card-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 249, 253, 0.9) 100%);
+
+  /* Neutrals & Surfaces */
+  --bg-page: #F6F7FB;
+  --bg-card: #FFFFFF;
+  --bg-surface-secondary: #F0EFF7;
+  --bg-tag: #F4F3FA;
+  
+  /* Text Colors */
+  --text-main: #131422;
+  --text-secondary: #6B7085;
+  --text-muted: #9BA0B3;
+  --text-inverse: #FFFFFF;
+
+  /* Status Colors */
+  --color-success: #00B377;
+  --color-success-bg: #E8F8F2;
+  --color-warning: #FF9F1C;
+  --color-warning-bg: #FFF8EB;
+  --color-danger: #E63946;
+  --color-danger-bg: #FEECEE;
+
+  /* Borders & Dividers */
+  --border-subtle: #ECEEF6;
+  --border-focus: #6C3CE9;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 6px rgba(19, 20, 34, 0.04);
+  --shadow-md: 0 6px 18px rgba(19, 20, 34, 0.06);
+  --shadow-lg: 0 12px 32px rgba(19, 20, 34, 0.08);
+  --shadow-purple: 0 8px 24px rgba(108, 60, 233, 0.25);
+
+  /* Radii */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --radius-pill: 9999px;
+
+  /* Typography */
+  --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --transition-fast: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: #0E0D1B;
+  color: var(--text-main);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  outline: none;
+}
+
+input, select {
+  font-family: inherit;
+  outline: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(108, 60, 233, 0.2);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(108, 60, 233, 0.4);
+}
